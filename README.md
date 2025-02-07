@@ -41,7 +41,7 @@ A fast-paced 2D platformer game where you control gravity to navigate through ch
 
 1. **Clone the repository:**
 ```bash
-git clone https://github.com/[your-username]/gravity-runner.git
+git clone https://github.com/alexhail/gravity-runner.git
 cd gravity-runner
 ```
 
