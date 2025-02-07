@@ -1,0 +1,54 @@
+name: Deployment Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Service to rollback (frontend/backend)'
+        required: true
+        type: choice
+        options:
+          - frontend
+          - backend
+      commit_hash:
+        description: 'Commit hash to rollback to'
+        required: true
+        type: string
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Execute Rollback
+      uses: appleboy/ssh-action@master
+      with:
+        host: 45.55.57.18
+        username: ${{ secrets.SSH_USERNAME }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          if [ "${{ github.event.inputs.service }}" == "frontend" ]; then
+            cd /var/www/gravity.ahail.work
+            git fetch origin
+            git checkout ${{ github.event.inputs.commit_hash }}
+            cd frontend
+            npm ci
+            npm run build
+            sudo cp -r dist/* /var/www/gravity.ahail.work/
+          else
+            cd /var/www/api.gravity.ahail.work
+            git fetch origin
+            git checkout ${{ github.event.inputs.commit_hash }}
+            cd backend
+            npm ci
+            npm run build
+            pm2 stop gravity-backend || true
+            pm2 start dist/index.js --name gravity-backend
+            pm2 save
+          fi
+
+    - name: Verify Rollback
+      run: |
+        if [ "${{ github.event.inputs.service }}" == "frontend" ]; then
+          curl --fail https://gravity.ahail.work || exit 1
+        else
+          curl --fail https://api.gravity.ahail.work/health || exit 1 

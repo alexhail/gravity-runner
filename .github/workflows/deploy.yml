@@ -1,0 +1,243 @@
+name: Deploy
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: gravity_runner
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '18'
+
+      - name: Verify MySQL Connection
+        run: |
+          sudo apt-get install -y mysql-client
+          mysql -h127.0.0.1 -P3306 -uroot -proot -e "
+            CREATE USER IF NOT EXISTS 'github'@'%' IDENTIFIED BY 'github';
+            GRANT ALL PRIVILEGES ON gravity_runner.* TO 'github'@'%';
+            FLUSH PRIVILEGES;
+          "
+
+      - name: Create Backend Production Environment File
+        run: |
+          cd backend
+          # First create migration env file with local database
+          echo "DB_HOST=mysql" >> .env
+          echo "DB_PORT=3306" >> .env
+          echo "DB_USER=root" >> .env
+          echo "DB_PASSWORD=root" >> .env
+          echo "DB_NAME=gravity_runner" >> .env
+          echo "NODE_ENV=development" >> .env
+          # Then create the production env file
+          echo "DB_HOST=${{ secrets.DB_HOST }}" >> .env.production
+          echo "DB_PORT=${{ secrets.DB_PORT }}" >> .env.production
+          echo "DB_USER=${{ secrets.DB_USER }}" >> .env.production
+          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env.production
+          echo "DB_NAME=${{ secrets.DB_NAME }}" >> .env.production
+          echo "PORT=${{ secrets.BACKEND_PORT }}" >> .env.production
+          echo "NODE_ENV=production" >> .env.production
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env.production
+          echo "CORS_ORIGIN=${{ secrets.CORS_ORIGIN }}" >> .env.production
+          echo "LOG_LEVEL=info" >> .env.production
+
+      - name: Create Frontend Production Environment File
+        run: |
+          cd frontend
+          # Create production environment file with the correct API URL
+          echo "VITE_API_URL=https://api.gravity.ahail.work" >> .env.production
+          echo "VITE_GAME_WIDTH=800" >> .env.production
+          echo "VITE_GAME_HEIGHT=600" >> .env.production
+          echo "VITE_DEBUG_MODE=false" >> .env.production
+          echo "VITE_ENABLE_ANALYTICS=true" >> .env.production
+
+      - name: Install Backend Dependencies
+        run: |
+          cd backend
+          npm install
+
+      - name: Build Backend
+        run: |
+          cd backend
+          npm run build
+
+      - name: Install Frontend Dependencies
+        run: |
+          cd frontend
+          npm install
+
+      - name: Build Frontend
+        run: |
+          cd frontend
+          # Build with production environment
+          npm run build
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy Backend
+        run: |
+          cd backend
+          tar czf ../backend.tar.gz -C . .
+          # Create the directory structure first
+          ssh -i ~/.ssh/deploy_key ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "mkdir -p ${{ secrets.DEPLOY_PATH }}"
+          # Then copy and extract
+          scp -i ~/.ssh/deploy_key ../backend.tar.gz ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_PATH }}/
+          ssh -i ~/.ssh/deploy_key ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "cd ${{ secrets.DEPLOY_PATH }} && \
+            tar xzf backend.tar.gz && \
+            rm backend.tar.gz && \
+            npm install --production && \
+            echo '=== Setting up Environment ===' && \
+            cp .env.production .env && \
+            cp .env dist/.env && \
+            sed -i 's/DB_HOST=.*/DB_HOST=localhost/' .env && \
+            sed -i 's/DB_HOST=.*/DB_HOST=localhost/' dist/.env && \
+            # Add DB_PASS as well since data-source.ts checks for both
+            echo "DB_PASS=${{ secrets.DB_PASSWORD }}" >> .env && \
+            echo "DB_PASS=${{ secrets.DB_PASSWORD }}" >> dist/.env && \
+            echo '=== Setting up MySQL User ===' && \
+            MYSQL_ADMIN_PASS=\$(sudo cat /etc/mysql/debian.cnf | grep -m 1 password | cut -d' ' -f3) && \
+            mysql -udebian-sys-maint -p\"\${MYSQL_ADMIN_PASS}\" -e \"ALTER USER '${{ secrets.DB_USER }}'@'localhost' IDENTIFIED BY '${{ secrets.DB_PASSWORD }}';\" && \
+            mysql -udebian-sys-maint -p\"\${MYSQL_ADMIN_PASS}\" -e \"FLUSH PRIVILEGES;\" && \
+            echo '=== Environment Contents ===' && \
+            cat dist/.env && \
+            echo '=== Starting Backend ===' && \
+            pm2 delete gravity-runner-backend || true && \
+            NODE_ENV=production pm2 start dist/index.js --name gravity-runner-backend && \
+            echo '=== Waiting for Backend to Start ===' && \
+            sleep 10 && \
+            echo '=== PM2 Status ===' && \
+            pm2 status && \
+            echo '=== PM2 Logs ===' && \
+            pm2 logs gravity-runner-backend --lines 50 --nostream && \
+            echo '=== Backend Health Check ===' && \
+            curl -v http://localhost:${{ secrets.BACKEND_PORT }}/api/health"
+
+      - name: Run Production Database Migrations
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "cd ${{ secrets.DEPLOY_PATH }} && \
+            echo '=== Creating MySQL Update Script ===' && \
+            echo '#!/bin/bash' > update_mysql.sh && \
+            echo 'MYSQL_ADMIN_PASS=\$(sudo cat /etc/mysql/debian.cnf | grep -m 1 password | cut -d\" \" -f3)' >> update_mysql.sh && \
+            echo 'mysql -udebian-sys-maint -p\"\${MYSQL_ADMIN_PASS}\" -e \"ALTER USER '\''${{ secrets.DB_USER }}'\''@'\''localhost'\'' IDENTIFIED BY '\''${{ secrets.DB_PASSWORD }}'\'';\"' >> update_mysql.sh && \
+            echo 'mysql -udebian-sys-maint -p\"\${MYSQL_ADMIN_PASS}\" -e \"FLUSH PRIVILEGES;\"' >> update_mysql.sh && \
+            chmod +x update_mysql.sh && \
+            echo '=== Running MySQL Update ===' && \
+            ./update_mysql.sh && \
+            rm update_mysql.sh && \
+            echo '=== Running Migrations ===' && \
+            cp .env.production .env && \
+            NODE_ENV=production npm run migration:run && \
+            echo '=== Verifying Database Tables ===' && \
+            MYSQL_ADMIN_PASS=\$(sudo cat /etc/mysql/debian.cnf | grep -m 1 password | cut -d' ' -f3) && \
+            mysql -udebian-sys-maint -p\"\${MYSQL_ADMIN_PASS}\" ${{ secrets.DB_NAME }} -e \" \
+              SHOW TABLES; \
+              SELECT 'users table structure:' as ''; DESCRIBE users; \
+              SELECT 'profiles table structure:' as ''; DESCRIBE profiles; \
+              SELECT 'scores table structure:' as ''; DESCRIBE scores;\" \
+            "
+
+      - name: Check Production MySQL
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "
+            echo '=== Creating MySQL Check Script ==='
+            echo '#!/bin/bash' > check_mysql.sh
+            echo 'MYSQL_ADMIN_PASS=\$(sudo cat /etc/mysql/debian.cnf | grep -m 1 password | cut -d\" \" -f3)' >> check_mysql.sh
+            echo 'echo \"Checking MySQL service status...\"' >> check_mysql.sh
+            echo 'sudo systemctl status mysql --no-pager' >> check_mysql.sh
+            echo 'echo \"Checking database...\"' >> check_mysql.sh
+            echo 'mysql -udebian-sys-maint -p\"\${MYSQL_ADMIN_PASS}\" -e \"SHOW DATABASES LIKE '\''${{ secrets.DB_NAME }}'\'';\"' >> check_mysql.sh
+            chmod +x check_mysql.sh
+            ./check_mysql.sh
+            rm check_mysql.sh
+          "
+
+      - name: Deploy Frontend
+        run: |
+          cd frontend
+          tar czf ../frontend.tar.gz -C dist .
+          # Create the directory structure for the frontend's document root
+          ssh -i ~/.ssh/deploy_key ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "sudo mkdir -p /var/www/gravity.ahail.work && sudo chown -R www-data:www-data /var/www/gravity.ahail.work"
+          # Copy the tar file to a temporary location and extract it into the document root
+          scp -i ~/.ssh/deploy_key ../frontend.tar.gz ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/tmp/
+          ssh -i ~/.ssh/deploy_key ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "sudo tar xzf /tmp/frontend.tar.gz -C /var/www/gravity.ahail.work && sudo rm /tmp/frontend.tar.gz"
+
+      - name: Configure Apache Sites
+        run: |
+          # Copy the Apache configuration files from the repository to a temporary folder on the remote host
+          scp -i ~/.ssh/deploy_key -r deployment/apache ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/tmp/
+          # On the remote host, copy the configuration files to Apache's sites-available,
+          # enable the sites, and reload Apache to apply the changes.
+          ssh -t -i ~/.ssh/deploy_key ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << EOF
+            # Enable required Apache modules
+            sudo a2enmod proxy
+            sudo a2enmod proxy_http
+            sudo a2enmod proxy_wstunnel
+            sudo a2enmod rewrite
+            sudo a2enmod ssl
+            sudo a2enmod headers
+
+            # Set the backend port in Apache config
+            sudo sed -i "s/Define BACKEND_PORT .*/Define BACKEND_PORT ${{ secrets.BACKEND_PORT }}/" /tmp/apache/api.gravity.ahail.work.conf
+
+            sudo cp /tmp/apache/*.conf /etc/apache2/sites-available/
+            sudo a2ensite api.gravity.ahail.work.conf gravity.ahail.work.conf
+            sudo a2dissite 000-default.conf default-ssl.conf
+
+            # Add CORS headers
+            sudo sed -i '/ServerAdmin/a\    Header set Access-Control-Allow-Origin "*"\n    Header set Access-Control-Allow-Methods "GET,POST,OPTIONS,DELETE,PUT"\n    Header set Access-Control-Allow-Headers "Content-Type, Authorization"' /etc/apache2/sites-available/api.gravity.ahail.work.conf
+
+            # Create temporary self-signed certificates if they don't exist,
+            # so that Apache configuration passes the config test.
+            if [ ! -f /etc/letsencrypt/live/gravity.ahail.work/fullchain.pem ]; then
+              sudo mkdir -p /etc/letsencrypt/live/gravity.ahail.work
+              sudo openssl req -x509 -nodes -days 1 -newkey rsa:2048 \
+                -keyout /etc/letsencrypt/live/gravity.ahail.work/privkey.pem \
+                -out /etc/letsencrypt/live/gravity.ahail.work/fullchain.pem \
+                -subj "/CN=gravity.ahail.work"
+            fi
+            if [ ! -f /etc/letsencrypt/live/api.gravity.ahail.work/fullchain.pem ]; then
+              sudo mkdir -p /etc/letsencrypt/live/api.gravity.ahail.work
+              sudo openssl req -x509 -nodes -days 1 -newkey rsa:2048 \
+                -keyout /etc/letsencrypt/live/api.gravity.ahail.work/privkey.pem \
+                -out /etc/letsencrypt/live/api.gravity.ahail.work/fullchain.pem \
+                -subj "/CN=api.gravity.ahail.work"
+            fi
+
+            # Obtain/renew SSL certificates using Certbot with the Apache plugin
+            sudo certbot --apache --non-interactive --agree-tos --email "${{ secrets.LETSENCRYPT_EMAIL }}" -d gravity.ahail.work -d api.gravity.ahail.work
+            
+            # Test the Apache configuration before restarting
+            sudo apache2ctl configtest && sudo systemctl restart apache2
+            
+            # Check the status and logs
+            echo "=== Apache Status ==="
+            sudo systemctl status apache2 --no-pager
+            echo "=== Apache Error Log ==="
+            sudo tail -n 50 /var/log/apache2/api.gravity.ahail.work-error.log
+            echo "=== Backend Status ==="
+            curl -v http://localhost:${{ secrets.BACKEND_PORT }}/api/health
+          EOF
+
+    env:
+      CI: true 
