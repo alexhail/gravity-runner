@@ -9,7 +9,7 @@ Using @docs as a guide, implement the next uncompleted task for our @frontend or
 Yes please implement the next task for the @frontend or @backend in the @TASKS.md file and check them off when you are done.
 
 >>> Current Fixes Prompt:
-Using @docs as a guide, implement the current fixes for our @frontend or @backend in the @TASKS.md file.
+Using @docs as a guide, implement the current fixes or changes for our @frontend or @backend in the @TASKS.md file. Then mark the task as completed when you are finshed.
 
 >>> Tasks.md Optimization Prompt:
 Using @docs as a guide, as well as the @frontend and @backend folders of our project, and optimize the @TASKS.md file and replace the tasks that are no longer needed with a summary of them under a "Completed" header. Then analyze the remaining tasks and determine if they are still relevant or if they can be removed, and provide some possible future phases, improvements, features, or ideas for the project.
@@ -17,7 +17,7 @@ Using @docs as a guide, as well as the @frontend and @backend folders of our pro
 *** ALWAYS UPDATE YOUR MOST RECENT CURRENT FOCUSES AT THE BOTTOM OF THE @TASKS.md FILE ***
 
 ## CURRENT FIXES & CHANGED NEEDED (DO THESE FIRST ALWAYS)
-- [ ] Remove the ability to change music and SFX volume in the PROFILE game scene
+- [x] I would like to make sure that when playing as a guest, highscores are still sumbitted to the leaderboard instead of only having logged in users scores sumbitted. For a username, just put like Guest_XXXXXXXXXXX where the X's are randomly seeded, guarenteed unique numbers. BUT Please store these numbers in the person localStorage so that it can be kind of consistent across sessions.
 
 ## Completed Phases Summary
 ### Phase 1-5 Achievements

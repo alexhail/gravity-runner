@@ -512,51 +512,57 @@ export class GameScene extends Scene {
   private async updateProfileStats(): Promise<void> {
     try {
       const token = localStorage.getItem('token');
-      // Don't update stats if playing as guest
-      if (!token || this.game.registry.get('isGuestMode')) {
-        return;
-      }
-
-      const playTime = Math.floor((Date.now() - this.gameStats.startTime) / 1000); // Convert to seconds
-      
       const baseUrl = import.meta.env.VITE_API_URL.replace(/\/$/, ''); // Remove trailing slash if present
       
-      // Update profile stats
-      const profileResponse = await fetch(`${baseUrl}/api/profiles/stats`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          playTime,
-          score: this.playerState.score,
-          distance: this.gameStats.maxDistance,
-          collectibles: this.gameStats.collectiblesCollected
-        })
-      });
+      // If logged in, update profile stats
+      if (token && !this.game.registry.get('isGuestMode')) {
+        // Update profile stats
+        const profileResponse = await fetch(`${baseUrl}/api/profiles/stats`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            playTime: Math.floor((Date.now() - this.gameStats.startTime) / 1000),
+            score: this.playerState.score,
+            distance: this.gameStats.maxDistance,
+            collectibles: this.gameStats.collectiblesCollected
+          })
+        });
 
-      if (!profileResponse.ok) {
-        console.error('Failed to update profile stats');
+        if (!profileResponse.ok) {
+          console.error('Failed to update profile stats');
+        }
       }
 
-      // Submit score to leaderboard
+      // Get or generate guest ID for guest users
+      let guestId = localStorage.getItem('guestId');
+      if (!guestId) {
+        // Generate a random 10-digit number
+        guestId = Math.floor(Math.random() * 9000000000 + 1000000000).toString();
+        localStorage.setItem('guestId', guestId);
+      }
+
+      // Submit score to leaderboard (for both guests and logged-in users)
       const scoreResponse = await fetch(`${baseUrl}/api/scores`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          ...(token && !this.game.registry.get('isGuestMode') ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify({
           score: this.playerState.score,
-          gameTime: playTime,
+          gameTime: Math.floor((Date.now() - this.gameStats.startTime) / 1000),
           collectibles: this.gameStats.collectiblesCollected,
-          distance: this.gameStats.maxDistance
+          distance: this.gameStats.maxDistance,
+          ...(this.game.registry.get('isGuestMode') ? { guestId } : {})
         })
       });
 
       if (!scoreResponse.ok) {
         console.error('Failed to submit score to leaderboard');
+        return;
       }
 
       const scoreResult = await scoreResponse.json();

@@ -6,12 +6,15 @@ export class Score {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Column()
-  userId!: number;
+  @Column({ nullable: true })
+  userId?: number;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { nullable: true })
   @JoinColumn({ name: 'userId' })
-  user!: User;
+  user?: User;
+
+  @Column({ nullable: true })
+  guestUsername?: string;
 
   @Column()
   score!: number;

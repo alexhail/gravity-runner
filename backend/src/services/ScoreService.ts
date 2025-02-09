@@ -18,17 +18,39 @@ export class ScoreService {
   }
 
   async submitScore(
-    userId: number,
-    data: { score: number; gameTime: number; collectibles: number; distance: number }
+    userId: number | null,
+    data: { 
+      score: number; 
+      gameTime: number; 
+      collectibles: number; 
+      distance: number;
+      guestUsername?: string;
+    }
   ): Promise<{ id: number; rank: number; isHighScore: boolean }> {
     const score = new Score();
-    score.userId = userId;
+    if (userId) {
+      score.userId = userId;
+    } else {
+      // For guest users, we'll use a special guest user ID or null
+      score.userId = null;
+      score.guestUsername = data.guestUsername || 'Guest';
+    }
     score.score = data.score;
     score.gameTime = data.gameTime;
     score.collectibles = data.collectibles;
     score.distance = data.distance;
 
     const savedScore = await this.scoreRepository.save(score);
+
+    // For guest users, we only calculate rank
+    if (!userId) {
+      const rank = await this.calculateRank(data.score);
+      return {
+        id: savedScore.id,
+        rank,
+        isHighScore: false
+      };
+    }
 
     // Get user's previous high score
     const previousHighScore = await this.scoreRepository.findOne({

@@ -5,20 +5,38 @@ import { authenticateToken } from '../middleware/auth';
 const router = Router();
 const scoreService = new ScoreService();
 
-// Submit a new score (requires authentication)
-router.post('/', authenticateToken, async (req: Request, res: Response) => {
+// Submit a new score (public endpoint with optional authentication)
+router.post('/', async (req: Request, res: Response) => {
   try {
-    if (!req.user) {
-      return res.status(401).json({ message: 'User not authenticated' });
+    let userId: number | null = null;
+    let username: string = 'Guest';
+
+    // If authenticated, use the user's ID
+    if (req.headers.authorization) {
+      try {
+        const authResult = await authenticateToken(req, res, () => {});
+        if (req.user) {
+          userId = req.user.id;
+        }
+      } catch (error) {
+        // If auth fails, continue as guest
+        console.log('Auth failed, continuing as guest');
+      }
     }
-    const userId = req.user.id;
-    const { score, gameTime, collectibles, distance } = req.body;
+
+    const { score, gameTime, collectibles, distance, guestId } = req.body;
+
+    // For guest users, use the provided guestId as username
+    if (!userId && guestId) {
+      username = `Guest_${guestId}`;
+    }
 
     const result = await scoreService.submitScore(userId, {
       score,
       gameTime,
       collectibles,
       distance,
+      guestUsername: username
     });
 
     res.status(201).json(result);

@@ -15,7 +15,14 @@ export class CreateScoresTable1707307300000 implements MigrationInterface {
                     },
                     {
                         name: "userId",
-                        type: "int"
+                        type: "int",
+                        isNullable: true
+                    },
+                    {
+                        name: "guestUsername",
+                        type: "varchar",
+                        length: "50",
+                        isNullable: true
                     },
                     {
                         name: "score",
