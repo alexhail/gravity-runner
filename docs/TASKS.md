@@ -17,7 +17,7 @@ Using @docs as a guide, as well as the @frontend and @backend folders of our pro
 *** ALWAYS UPDATE YOUR MOST RECENT CURRENT FOCUSES AT THE BOTTOM OF THE @TASKS.md FILE ***
 
 ## CURRENT FIXES & CHANGED NEEDED (DO THESE FIRST ALWAYS)
-- [x] I would like to make sure that when playing as a guest, highscores are still sumbitted to the leaderboard instead of only having logged in users scores sumbitted. For a username, just put like Guest_XXXXXXXXXXX where the X's are randomly seeded, guarenteed unique numbers. BUT Please store these numbers in the person localStorage so that it can be kind of consistent across sessions.
+- [x] Update the game play to make sure players only have 1 life total. Remove the life count label. Make sure that death by getting caught by an enemy or falling off the map results in a game over in the exact same way, they differ right now.
 
 ## Completed Phases Summary
 ### Phase 1-5 Achievements

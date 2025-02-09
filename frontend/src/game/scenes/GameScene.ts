@@ -3,7 +3,6 @@ import { Scene, GameObjects, Physics, Types } from 'phaser';
 interface PlayerState {
   isGravityFlipped: boolean;
   speed: number;
-  lives: number;
   score: number;
   isInvulnerable: boolean;
   lastFlipTime: number;  // Track the last time player flipped gravity
@@ -25,7 +24,6 @@ export class GameScene extends Scene {
   private playerState: PlayerState = {
     isGravityFlipped: false,
     speed: 400,
-    lives: 3,
     score: 0,
     isInvulnerable: false,
     lastFlipTime: 0,
@@ -51,7 +49,6 @@ export class GameScene extends Scene {
   // Constants
   private readonly PLAYER_GRAVITY: number = 3000;
   private readonly PLAYER_SPEED: number = 650;
-  private readonly INITIAL_LIVES: number = 3;
   private readonly PLAYER_SCALE: number = 1.4;
   private readonly ENEMY_SCALE: number = 1.6;
   private readonly PLATFORM_SIZE: number = 36;
@@ -66,7 +63,6 @@ export class GameScene extends Scene {
     this.playerState = {
       isGravityFlipped: false,
       speed: this.PLAYER_SPEED,
-      lives: this.INITIAL_LIVES,
       score: 0,
       isInvulnerable: false,
       lastFlipTime: 0,
@@ -420,14 +416,8 @@ export class GameScene extends Scene {
       color: '#ffffff'
     });
     
-    this.livesText = this.add.text(16, 56, `Lives: ${this.playerState.lives}`, {
-      fontSize: '32px',
-      color: '#ffffff'
-    });
-    
     // Fix UI to camera
     this.scoreText.setScrollFactor(0);
-    this.livesText.setScrollFactor(0);
   }
 
   private setupInputs(): void {
@@ -504,7 +494,7 @@ export class GameScene extends Scene {
   }
 
   private checkGameOver(): void {
-    if (this.playerState.lives <= 0 && !this.isGameEnding) {
+    if (this.playerState.score <= 0 && !this.isGameEnding) {
       this.handleGameOver();
     }
   }
@@ -609,23 +599,13 @@ export class GameScene extends Scene {
 
   private handleObstacleCollision(): void {
     if (!this.playerState.isInvulnerable) {
-      // Decrement lives
-      this.playerState.lives -= 1;
-
-      // Clamp lives so they never go negative
-      if (this.playerState.lives < 0) {
-        this.playerState.lives = 0;
+      // Play death sound if available
+      if (this.sound.get('deathSound')) {
+        this.sound.play('deathSound', { volume: this.game.registry.get('sfxVolume') ?? 0.5 });
       }
-      // Update UI
-      this.livesText.setText(`Lives: ${this.playerState.lives}`);
 
-      // Trigger game over if no lives remain
-      if (this.playerState.lives <= 0) {
-        this.scene.start('GameOverScene', {
-          score: this.playerState.score,
-          isGuest: this.game.registry.get('isGuestMode') ?? false
-        });
-      }
+      // Trigger game over immediately
+      this.handleGameOver();
     }
   }
 
@@ -848,30 +828,10 @@ export class GameScene extends Scene {
       // Disable player input temporarily
       if (this.input.keyboard) {
         this.input.keyboard.enabled = false;
-        // Re-enable input after a short delay
-        this.time.delayedCall(500, () => {
-          if (this.input.keyboard) {
-            this.input.keyboard.enabled = true;
-          }
-        });
       }
       
-      // Play death sound if available
-      if (this.sound.get('deathSound')) {
-        this.sound.play('deathSound', { volume: this.game.registry.get('sfxVolume') ?? 0.5 });
-      }
-      
-      // Reduce lives
-      this.playerState.lives--;
-      this.livesText.setText(`Lives: ${this.playerState.lives}`);
-      
-      // Reset player state and position
-      this.resetOnDeath();
-      
-      // Check for game over
-      if (this.playerState.lives <= 0) {
-        this.handleGameOver();
-      }
+      // Trigger game over
+      this.handleGameOver();
     }
   }
 
