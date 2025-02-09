@@ -86,10 +86,16 @@ export class ScoreService {
           'score.userId',
           'score.score',
           'score.createdAt',
-          'score.guestUsername',
           'user.id',
           'user.username'
         ]);
+
+      // Try to add guestUsername to selection if it exists
+      try {
+        queryBuilder.addSelect('score.guestUsername');
+      } catch (error) {
+        console.log('guestUsername column not available yet');
+      }
 
       // Apply date filter based on timeframe
       if (timeframe !== 'all') {
