@@ -4,7 +4,7 @@ import { Score } from '../models/Score';
 
 interface LeaderboardEntry {
   rank: number;
-  playerId: number;
+  playerId: number | null;
   playerName: string;
   score: number;
   timestamp: Date;
@@ -31,7 +31,7 @@ export class ScoreService {
     if (userId) {
       score.userId = userId;
     } else {
-      // For guest users, we'll use a special guest user ID or null
+      // For guest users, we'll use null for userId
       score.userId = null;
       score.guestUsername = data.guestUsername || 'Guest';
     }
@@ -86,6 +86,7 @@ export class ScoreService {
           'score.userId',
           'score.score',
           'score.createdAt',
+          'score.guestUsername',
           'user.id',
           'user.username'
         ]);
@@ -129,10 +130,10 @@ export class ScoreService {
 
       console.log(`Found ${scores.length} scores out of ${total} total`);
 
-      const leaderboard = scores.map((score, index) => ({
+      const leaderboard: LeaderboardEntry[] = scores.map((score, index) => ({
         rank: offset + index + 1,
-        playerId: score.userId,
-        playerName: score.user?.username || 'Unknown',
+        playerId: score.userId || null,
+        playerName: score.guestUsername || score.user?.username || 'Unknown',
         score: score.score,
         timestamp: score.createdAt
       }));

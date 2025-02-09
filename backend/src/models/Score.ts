@@ -6,8 +6,8 @@ export class Score {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Column({ nullable: true })
-  userId?: number;
+  @Column({ nullable: true, type: 'int' })
+  userId: number | null = null;
 
   @ManyToOne(() => User, { nullable: true })
   @JoinColumn({ name: 'userId' })
