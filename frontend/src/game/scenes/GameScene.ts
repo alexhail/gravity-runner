@@ -75,10 +75,13 @@ export class GameScene extends Scene {
   }
 
   create(): void {
+    // Reset game ending flag first
+    this.isGameEnding = false;
+    
     // Reset game state at the start
     this.resetPlayerState();
     
-    // Ensure input is enabled and reset
+    // Ensure input is properly initialized
     if (this.input.keyboard) {
       this.input.keyboard.enabled = true;
       this.input.keyboard.clearCaptures();
@@ -617,11 +620,6 @@ export class GameScene extends Scene {
         this.sound.play('deathSound', { volume: this.game.registry.get('sfxVolume') ?? 0.5 });
       }
 
-      // Disable player movement
-      if (this.input.keyboard) {
-        this.input.keyboard.enabled = false;
-      }
-
       // Trigger game over immediately
       this.handleGameOver();
     }
@@ -831,6 +829,11 @@ export class GameScene extends Scene {
     if (this.isGameEnding) return;
     this.isGameEnding = true;
     
+    // Disable player input and physics
+    if (this.input.keyboard) {
+      this.input.keyboard.enabled = false;
+    }
+    
     // Stop background music
     if (this.bgMusic) {
       this.bgMusic.stop();
@@ -845,6 +848,8 @@ export class GameScene extends Scene {
     
     // Save high score and update stats before transitioning
     this.updateProfileStats().finally(() => {
+      // Stop current scene before starting game over scene
+      this.scene.stop('GameScene');
       // Transition to game over scene
       this.scene.start('GameOverScene', {
         score: this.playerState.score,
@@ -859,7 +864,6 @@ export class GameScene extends Scene {
     // Clean up input listeners when scene shuts down
     if (this.input.keyboard) {
       this.input.keyboard.removeAllListeners();
-      this.input.keyboard.enabled = true;
     }
     this.input.removeAllListeners();
     
