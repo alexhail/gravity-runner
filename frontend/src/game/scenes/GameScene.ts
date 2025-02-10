@@ -36,7 +36,6 @@ export class GameScene extends Scene {
     finalScore: 0
   };
   private scoreText!: GameObjects.Text;
-  private livesText!: GameObjects.Text;
   private gameSpeed: number = 400;
   private bgMusic!: Phaser.Sound.BaseSound;
   private lastPlatformX: number = 0;
@@ -607,33 +606,6 @@ export class GameScene extends Scene {
       // Trigger game over immediately
       this.handleGameOver();
     }
-  }
-
-  private resetOnDeath(): void {
-    // Reset player physics state
-    this.player.setVelocity(0, 0);
-    this.player.setPosition(100, 450);
-    
-    // Reset gravity state
-    this.playerState.isGravityFlipped = false;
-    this.physics.world.gravity.y = this.PLAYER_GRAVITY;
-    this.player.setFlipY(false);
-
-    // Reset game speed to initial value
-    this.gameSpeed = this.PLAYER_SPEED;
-
-    // Clear all existing platforms and regenerate
-    this.platforms.clear(true, true);
-    this.generateInitialPlatforms();
-
-    // Reset pursuing enemy
-    if (this.pursuingEnemy && this.pursuingEnemy.active) {
-      this.pursuingEnemy.destroy();
-    }
-    this.createPursuingEnemy();
-
-    // Reset camera
-    this.cameras.main.scrollX = 0;
   }
 
   private handleCollectibleCollection(_player: Physics.Arcade.Sprite | Physics.Arcade.Body | Phaser.Tilemaps.Tile, collectible: Physics.Arcade.Sprite | Physics.Arcade.Body | Phaser.Tilemaps.Tile): void {
