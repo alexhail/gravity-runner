@@ -505,7 +505,6 @@ export class GameScene extends Scene {
   private checkGameOver(): void {
     // Remove the score check as it was preventing death
     if (!this.isGameEnding) {
-      const playerBody = this.player.body as Physics.Arcade.Body;
       // Check for falling off the map
       if (this.player.y > this.scale.height + 100 || this.player.y < -100) {
         this.handleGameOver();
