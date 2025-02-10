@@ -503,8 +503,13 @@ export class GameScene extends Scene {
   }
 
   private checkGameOver(): void {
-    if (this.playerState.score <= 0 && !this.isGameEnding) {
-      this.handleGameOver();
+    // Remove the score check as it was preventing death
+    if (!this.isGameEnding) {
+      const playerBody = this.player.body as Physics.Arcade.Body;
+      // Check for falling off the map
+      if (this.player.y > this.scale.height + 100 || this.player.y < -100) {
+        this.handleGameOver();
+      }
     }
   }
 
@@ -607,10 +612,15 @@ export class GameScene extends Scene {
   }
 
   private handleObstacleCollision(): void {
-    if (!this.playerState.isInvulnerable) {
+    if (!this.playerState.isInvulnerable && !this.isGameEnding) {
       // Play death sound if available
       if (this.sound.get('deathSound')) {
         this.sound.play('deathSound', { volume: this.game.registry.get('sfxVolume') ?? 0.5 });
+      }
+
+      // Disable player movement
+      if (this.input.keyboard) {
+        this.input.keyboard.enabled = false;
       }
 
       // Trigger game over immediately
@@ -830,13 +840,18 @@ export class GameScene extends Scene {
     // Update final score in game stats
     this.gameStats.finalScore = this.playerState.score;
     
+    // Disable player physics
+    const playerBody = this.player.body as Physics.Arcade.Body;
+    playerBody.enable = false;
+    
     // Save high score and update stats before transitioning
     this.updateProfileStats().finally(() => {
       // Transition to game over scene
       this.scene.start('GameOverScene', {
         score: this.playerState.score,
         distance: this.gameStats.maxDistance,
-        collectibles: this.gameStats.collectiblesCollected
+        collectibles: this.gameStats.collectiblesCollected,
+        isGuest: this.game.registry.get('isGuestMode') ?? true
       });
     });
   }
