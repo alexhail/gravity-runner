@@ -51,6 +51,11 @@ export class GameOverScene extends Scene {
     this.createButton(centerX, buttonStartY, 'Play Again', () => {
       // Reset game state and start new game
       this.game.registry.set('score', 0);
+      // Reset input state before starting new game
+      if (this.input.keyboard) {
+        this.input.keyboard.enabled = true;
+        this.input.keyboard.clearCaptures();
+      }
       this.scene.stop('GameScene');
       this.scene.start('GameScene');
     });

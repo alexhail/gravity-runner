@@ -78,6 +78,12 @@ export class GameScene extends Scene {
     // Reset game state at the start
     this.resetPlayerState();
     
+    // Ensure input is enabled and reset
+    if (this.input.keyboard) {
+      this.input.keyboard.enabled = true;
+      this.input.keyboard.clearCaptures();
+    }
+    
     // Initialize game stats
     this.gameStats = {
       startTime: Date.now(),
@@ -420,6 +426,10 @@ export class GameScene extends Scene {
   }
 
   private setupInputs(): void {
+    // Clear any existing keyboard listeners first
+    this.input.keyboard?.removeAllListeners();
+    
+    // Set up new listeners
     this.input.keyboard?.on('keydown-SPACE', this.flipGravity, this);
     this.input.on('pointerdown', this.flipGravity, this);
     this.input.keyboard?.on('keydown-F1', this.toggleDebug, this);
@@ -829,5 +839,22 @@ export class GameScene extends Scene {
         collectibles: this.gameStats.collectiblesCollected
       });
     });
+  }
+
+  shutdown(): void {
+    // Clean up input listeners when scene shuts down
+    if (this.input.keyboard) {
+      this.input.keyboard.removeAllListeners();
+      this.input.keyboard.enabled = true;
+    }
+    this.input.removeAllListeners();
+    
+    // Stop any ongoing sounds
+    if (this.bgMusic) {
+      this.bgMusic.stop();
+    }
+    
+    // Reset game state
+    this.resetPlayerState();
   }
 } 

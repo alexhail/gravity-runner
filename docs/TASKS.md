@@ -17,7 +17,7 @@ Using @docs as a guide, as well as the @frontend and @backend folders of our pro
 *** ALWAYS UPDATE YOUR MOST RECENT CURRENT FOCUSES AT THE BOTTOM OF THE @TASKS.md FILE ***
 
 ## CURRENT FIXES & CHANGED NEEDED (DO THESE FIRST ALWAYS)
-- [x] Update the game play to make sure players only have 1 life total. Remove the life count label. Make sure that death by getting caught by an enemy or falling off the map results in a game over in the exact same way, they differ right now.
+- [ ] After dying, hitting the game reset scene, and then clicking play again - The players controls become frozen and they are only able to flip gravity but not able to move. Please fix this and check for any other bugs like that.
 
 ## Completed Phases Summary
 ### Phase 1-5 Achievements
@@ -40,6 +40,7 @@ Using @docs as a guide, as well as the @frontend and @backend folders of our pro
   - Fixed type declarations
   - Cleaned up unused parameters
   - Resolved all critical linting errors blocking deployment
+- Fixed player control issues after death and game reset by properly managing input state and scene transitions
 
 ## Phase 7: Core Gameplay Enhancement
 - [x] Fundamental Gameplay Change
