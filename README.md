@@ -1,7 +1,5 @@
 # Gravity Runner
 
-🎮 **[Play Now](https://gravity.ahail.work)** - Try the latest version with global leaderboards!
-
 A fast-paced 2D platformer game where you control gravity to navigate through challenging, auto generated tunnel mazes. Built with Phaser 3, TypeScript, and Node.js. Test your skills by flipping gravity, avoiding obstacles, and competing for the highest score on the global leaderboard!
 
 ## 🎮 Features
